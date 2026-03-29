@@ -13,6 +13,7 @@
   extraEnv ? {},
   extraFwdEnv ? [],
   notifierConfig ? plugins.opencode-notifier-config,
+  treefmtEnabled ? true,
 }: let
   # opencode 1.2.27 from nixos-unstable:
   unsafe-src = pkgs.fetchurl {
@@ -45,7 +46,7 @@
     share = "disabled";
     theme = "solarized";
     lsp = false;
-    formatter = {
+    formatter = lib.optionalAttrs treefmtEnabled {
       biome.disabled = true;
       cargofmt.disabled = true;
       oxfmt.disabled = true;

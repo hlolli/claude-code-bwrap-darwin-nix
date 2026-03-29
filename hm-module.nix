@@ -110,6 +110,7 @@
       if cfg.serena.enable
       then serena
       else null;
+    treefmtEnabled = cfg.treefmt.enable;
     bwrap-escape-hatch = escapeHatch;
     preamblePath = cfg.preamble;
     bashrcSource = cfg.bashrc;
@@ -191,6 +192,12 @@ in {
     serena = {
       enable =
         mkEnableOption "Serena LSP/MCP integration (provides semantic code-navigation tools)"
+        // {default = true;};
+    };
+
+    treefmt = {
+      enable =
+        mkEnableOption "treefmt as the exclusive formatter (disables all built-in formatters)"
         // {default = true;};
     };
 

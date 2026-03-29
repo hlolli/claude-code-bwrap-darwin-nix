@@ -64,6 +64,7 @@ directories mounted read-write. Run `opencode` (aliased `oc`) from there.
 | `extraPackages`            | list of packages | Additional packages on the sandbox PATH                         |
 | `extraEnv`                 | attrs of strings | Static env vars set in the sandbox                              |
 | `extraFwdEnv`              | list of strings  | Host env vars forwarded into the sandbox                        |
+| `treefmt.enable`           | bool             | Use treefmt as exclusive formatter (default: true)              |
 | `serena.enable`            | bool             | Serena MCP integration for code navigation (default: true)      |
 | `notifications.enable`     | bool             | Desktop notifications + sounds via escape hatch (default: true) |
 | `notifications.sounds.*`   | path or null     | Per-event sound files (converted to WAV at build time)          |
