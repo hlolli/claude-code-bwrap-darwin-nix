@@ -239,8 +239,6 @@
         --setenv TERM "$TERM"
         --setenv TERMINFO_DIRS /etc/profiles/per-user/"$USER"/share/terminfo:/run/current-system/sw/share/terminfo
         --setenv LANG "$LANG"
-        --setenv LOCALE_ARCHIVE "$LOCALE_ARCHIVE"
-        --setenv LOCALE_ARCHIVE_2_27 "$LOCALE_ARCHIVE_2_27"
         --setenv NIX_PATH ${lib.escapeShellArg "nixpkgs=${pkgs.path}"}
         --setenv OPENCODE_DISABLE_LSP_DOWNLOAD "true"
       )
@@ -248,6 +246,13 @@
       if [ -f /etc/machine-id ]; then
         bwrap_opts+=( --ro-bind /etc/machine-id /etc/machine-id )
       fi
+
+      # Forward all `LOCALE_ARCHIVE*` env. variables:
+      while IFS='=' read -r _name _; do
+        if [[ "$_name" == LOCALE_ARCHIVE* ]]; then
+          bwrap_opts+=( --setenv "$_name" "''${!_name}" )
+        fi
+      done < <(env)
 
       for d in "''${persist_dirs[@]}" ; do
         mkdir -p "$sandbox_home"/"$d"
