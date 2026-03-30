@@ -245,6 +245,10 @@
         --setenv OPENCODE_DISABLE_LSP_DOWNLOAD "true"
       )
 
+      if [ -f /etc/machine-id ]; then
+        bwrap_opts+=( --ro-bind /etc/machine-id /etc/machine-id )
+      fi
+
       for d in "''${persist_dirs[@]}" ; do
         mkdir -p "$sandbox_home"/"$d"
         bwrap_opts+=( --bind "$sandbox_home"/"$d" "$HOME"/"$d" )
