@@ -127,6 +127,16 @@
     };
   };
 
+  # Runs inside the sandbox before the interactive shell.
+  sandboxInit = pkgs.writeShellScript "sandbox-init" ''
+    ${lib.optionalString (serena != null) ''
+      # Serena’s global config needs to be writable.
+      mkdir -p "$HOME/.serena"
+      install -m 644 ${./serena-config.yml} "$HOME/.serena/serena_config.yml"
+    ''}
+    exec "$@"
+  '';
+
   inherit (plugins) opencode-plugins;
 
   bashrc = pkgs.writeText "opencode-bashrc" ''
@@ -347,7 +357,7 @@
         "''${rw_opts[@]}" \
         "''${ro_git_opts[@]}" \
         --seccomp 3 3< <(${lib.getExe bwrapTiocstiFilter}) \
-        -- "$shell_exe"
+        -- ${sandboxInit} "$shell_exe"
     '';
     derivationArgs = {
       meta.description = "Enters a (multi-)project sandbox to run `opencode` inside; `.git` entries are mounted read-only unless OPENCODE_UNSAFE_RW_GIT is set.";
