@@ -60,6 +60,7 @@ directories mounted read-write. Run `opencode` (aliased `oc`) from there.
 | -------------------------- | ---------------- | --------------------------------------------------------------- |
 | `enable`                   | bool             | Enable the sandbox wrapper                                      |
 | `preamble`                 | path             | Instructions file mounted into the sandbox                      |
+| `dataDirPrefix`            | string           | Relative path under `$HOME` for persistent sandbox state        |
 | `bashrc` / `zshrc`         | path             | Shell configs sourced inside the sandbox                        |
 | `extraPackages`            | list of packages | Additional packages on the sandbox PATH                         |
 | `extraEnv`                 | attrs of strings | Static env vars set in the sandbox                              |

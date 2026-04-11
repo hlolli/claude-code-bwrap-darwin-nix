@@ -1,5 +1,6 @@
 {
   pkgs,
+  nixpkgs-opencode,
   lib,
   bun2nix,
   serena ? null,
@@ -8,6 +9,7 @@
   # Overridable by the home-manager module:
   preamblePath ? ./preamble.md,
   preambleScriptPath ? null,
+  dataDirPrefix ? ".local/share/opencode-bwrap",
   bashrcSource ? ./bashrc,
   zshrcSource ? ./zshrc,
   extraPackages ? [],
@@ -21,17 +23,10 @@
   },
   providerJSON ? {},
 }: let
-  # opencode 1.2.27 from nixos-unstable:
-  unsafe-src = pkgs.fetchurl {
-    url = "https://github.com/NixOS/nixpkgs/raw/f956974d2fc94684bb3118e2e0b4b12a0d58aac3/pkgs/by-name/op/opencode/package.nix";
-    hash = "sha256-q2hYaYpwCIpQfulhBegy8IhwlzkSPT2HNnkpXUhVpJU=";
-  };
-
-  unsafe = (pkgs.callPackage unsafe-src {}).overrideAttrs (prev: {
+  unsafe = nixpkgs-opencode.legacyPackages.${pkgs.stdenv.hostPlatform.system}.opencode.overrideAttrs (prev: {
     patches =
       (prev.patches or [])
       ++ [
-        ./opencode--no-builtin-anthropic.patch
         ./opencode--instructions_command.patch
         ./opencode--cursor-beam.patch
       ];
@@ -52,7 +47,6 @@
     "$schema" = "https://opencode.ai/config.json";
     compaction = compactionConfig;
     share = "disabled";
-    theme = "solarized";
     lsp = false;
     formatter = lib.optionalAttrs treefmtEnabled {
       biome.disabled = true;
@@ -101,9 +95,6 @@
         ];
       };
     };
-    tui = {
-      diff_style = "stacked";
-    };
     mcp = lib.optionalAttrs (serena != null) {
       serena = {
         type = "local";
@@ -127,6 +118,12 @@
         else "allow";
       doom_loop = "deny";
     };
+  };
+
+  tuiConfig = {
+    "$schema" = "https://opencode.ai/tui.json";
+    diff_style = "stacked";
+    theme = "solarized";
   };
 
   # Runs inside the sandbox before the interactive shell.
@@ -181,7 +178,7 @@
       # Keep build-time-only dependencies alive (prevent GC):
       # ${lib.getExe bun2nix}
 
-      data_dir="$HOME"/.local/share/opencode-bwrap
+      data_dir="$HOME"/${lib.escapeShellArg dataDirPrefix}
 
       sandbox_home="$data_dir"/home
       mkdir -p "$sandbox_home"
@@ -327,6 +324,7 @@
 
       # OpenCode config
       bwrap_opts+=( --ro-bind ${pkgs.writeText "config.json" (builtins.toJSON config)} "$HOME"/.config/opencode/config.json )
+      bwrap_opts+=( --ro-bind ${pkgs.writeText "tui.json" (builtins.toJSON tuiConfig)} "$HOME"/.config/opencode/tui.json )
 
       rw_opts=()
       ro_git_opts=()

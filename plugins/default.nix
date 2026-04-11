@@ -8,8 +8,8 @@
     src = pkgs.fetchFromGitHub {
       owner = "ex-machina-co";
       repo = "opencode-anthropic-auth";
-      rev = "78ac824951ccb6e39c036f8ff3933dc23a877cea"; # pull/13/head
-      hash = "sha256-VUhShn/Pg3SWW0xjc0TO4bVtlUilnadHbAs+CY3V6nc=";
+      rev = "v1.5.1";
+      hash = "sha256-4lB6b8PCfaLIaZsnN8CKRpALvpzOB2FwxSAIJvv7Z8E=";
     };
     # IFD: generate bun.nix from the upstream bun.lock using the bun2nix CLI.
     bun-nix = pkgs.runCommandLocal "opencode-anthropic-auth-bun.nix" {} ''
@@ -32,6 +32,7 @@
       dontUseBunBuild = true;
       dontUseBunCheck = true;
       dontUseBunInstall = true;
+      dontRunLifecycleScripts = true;
 
       buildPhase = ''
         runHook preBuild
@@ -139,10 +140,6 @@
     {
       name = "opencode-anthropic-auth.js";
       path = "${opencode-anthropic-auth}/dist/index.js";
-    }
-    {
-      name = "opencode-anthropic-auth-prompt.ts";
-      path = ./opencode-anthropic-auth-prompt.ts;
     }
     {
       name = "opencode-notifier.js";

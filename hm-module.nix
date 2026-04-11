@@ -106,6 +106,7 @@
 
   package = pkgs.callPackage ./opencode-bwrap {
     inherit bun2nix plugins notifierConfig;
+    inherit (inputs) nixpkgs-opencode;
     serena =
       if cfg.serena.enable
       then serena
@@ -122,7 +123,7 @@
         inherit (cfg.compaction) reserved;
       };
     providerJSON = cfg.provider;
-    inherit (cfg) extraPackages extraEnv extraFwdEnv;
+    inherit (cfg) dataDirPrefix extraPackages extraEnv extraFwdEnv;
   };
 
   # -- Option helpers (DRY) ------------------------------------------------
@@ -189,6 +190,13 @@ in {
       });
       example = literalExpression ''null'';
       description = "Store path to a script whose stdout is appended to the preamble at runtime (sets `instructions_command` in the OpenCode config). `null` disables the feature.";
+    };
+
+    dataDirPrefix = mkOption {
+      type = types.str;
+      default = ".local/share/opencode-bwrap";
+      example = ".cache/opencode-bwrap";
+      description = "Relative path under the host home directory where opencode-bwrap stores its persistent sandbox state.";
     };
 
     bashrc = mkOption {
@@ -305,6 +313,10 @@ in {
       {
         assertion = lib.all (name: builtins.match "[a-zA-Z_][a-zA-Z_0-9]*" name != null) (builtins.attrNames cfg.extraEnv);
         message = "programs.opencode-bwrap.extraEnv: every key must be a valid POSIX variable name ([a-zA-Z_][a-zA-Z_0-9]*)";
+      }
+      {
+        assertion = lib.all (segment: segment != "" && segment != "." && segment != "..") (lib.splitString "/" cfg.dataDirPrefix);
+        message = "programs.opencode-bwrap.dataDirPrefix: must be a normalized relative path under $HOME (no empty, '.' or '..' segments)";
       }
       {
         assertion = lib.all (name: builtins.match "[a-zA-Z_][a-zA-Z_0-9]*" name != null) cfg.extraFwdEnv;

@@ -1,45 +1,54 @@
 diff --git a/packages/opencode/src/session/instruction.ts b/packages/opencode/src/session/instruction.ts
-index 86f73d0fd..741af4a40 100644
+index fc90093e9..1d54e9fbd 100644
 --- a/packages/opencode/src/session/instruction.ts
 +++ b/packages/opencode/src/session/instruction.ts
-@@ -1,6 +1,7 @@
- import path from "path"
- import os from "os"
+@@ -8,6 +8,7 @@ import { makeRuntime } from "@/effect/run-service"
+ import { Flag } from "@/flag/flag"
+ import { AppFileSystem } from "@/filesystem"
+ import { withTransientReadRetry } from "@/util/effect-http-client"
++import { Process } from "@/util/process"
  import { Global } from "../global"
-+import { Process } from "../util/process"
- import { Filesystem } from "../util/filesystem"
- import { Config } from "../config/config"
  import { Instance } from "../project/instance"
-@@ -118,6 +119,23 @@ export namespace InstructionPrompt {
-     const config = await Config.get()
-     const paths = await systemPaths()
+ import { Log } from "../util/log"
+@@ -114,6 +115,28 @@ export namespace Instruction {
+           return new TextDecoder().decode(body)
+         })
  
-+    const commands: Promise<string>[] = []
-+    const instructionCmd = process.env.OPENCODE_EXTRA_INSTRUCTIONS_COMMAND
-+    if (instructionCmd) {
-+      if (!path.isAbsolute(instructionCmd)) {
-+        log.warn("OPENCODE_EXTRA_INSTRUCTIONS_COMMAND ignored: must be an absolute path", { cmd: instructionCmd })
-+      } else {
-+        commands.push(
-+          Process.text([instructionCmd], { abort: AbortSignal.timeout(10_000) })
-+            .then(({ text }) => (text.trim() ? "Instructions from command: " + instructionCmd + "\n" + text.trim() : ""))
-+            .catch((e) => {
-+              log.warn("OPENCODE_EXTRA_INSTRUCTIONS_COMMAND failed", { cmd: instructionCmd, error: String(e) })
-+              return ""
++        const command = Effect.fnUntraced(function* () {
++          const cmd = process.env.OPENCODE_EXTRA_INSTRUCTIONS_COMMAND
++          if (!cmd) return ""
++          if (!path.isAbsolute(cmd)) {
++            log.warn("OPENCODE_EXTRA_INSTRUCTIONS_COMMAND ignored: must be an absolute path", { cmd })
++            return ""
++          }
++          return yield* Effect.promise(() =>
++            Process.text([cmd], { abort: AbortSignal.timeout(10_000) }).then((out) => {
++              const text = out.text.trim()
++              return text ? `Instructions from command: ${cmd}\n${text}` : ""
 +            }),
-+        )
-+      }
-+    }
++          ).pipe(
++            Effect.catch((err) =>
++              Effect.sync(() => {
++                log.warn("OPENCODE_EXTRA_INSTRUCTIONS_COMMAND failed", { cmd, error: String(err) })
++                return ""
++              }),
++            ),
++          )
++        })
 +
-     const files = Array.from(paths).map(async (p) => {
-       const content = await Filesystem.readText(p).catch(() => "")
-       return content ? "Instructions from: " + p + "\n" + content : ""
-@@ -138,7 +156,7 @@ export namespace InstructionPrompt {
-         .then((x) => (x ? "Instructions from: " + url + "\n" + x : "")),
-     )
+         const clear = Effect.fn("Instruction.clear")(function* (messageID: MessageID) {
+           const s = yield* InstanceState.get(state)
+           s.claims.delete(messageID)
+@@ -168,10 +191,12 @@ export namespace Instruction {
+             (item) => item.startsWith("https://") || item.startsWith("http://"),
+           )
  
--    return Promise.all([...files, ...fetches]).then((result) => result.filter(Boolean))
-+    return Promise.all([...commands, ...files, ...fetches]).then((result) => result.filter(Boolean))
-   }
++          const extra = yield* command()
+           const files = yield* Effect.forEach(Array.from(paths), read, { concurrency: 8 })
+           const remote = yield* Effect.forEach(urls, fetch, { concurrency: 4 })
  
-   export function loaded(messages: MessageV2.WithParts[]) {
+           return [
++            ...(extra ? [extra] : []),
+             ...Array.from(paths).flatMap((item, i) => (files[i] ? [`Instructions from: ${item}\n${files[i]}`] : [])),
+             ...urls.flatMap((item, i) => (remote[i] ? [`Instructions from: ${item}\n${remote[i]}`] : [])),
+           ]
