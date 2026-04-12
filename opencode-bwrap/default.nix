@@ -222,6 +222,7 @@
         --ro-bind ${zshrc} /etc/zshrc
         --ro-bind ${pkgs.emptyFile} "$HOME"/.zshrc
         --ro-bind "${pkgs.nix-direnv}/share/nix-direnv/direnvrc" "$HOME"/.config/direnv/lib/nix-direnv.sh
+        --ro-bind "${pkgs.coreutils}/bin/env" /usr/bin/env
         --setenv SHELL "$shell_exe"
         --setenv PATH ${lib.makeBinPath ([
           unsafe
@@ -252,7 +253,6 @@
         /etc/terminfo
         /nix
         /run/current-system/sw
-        /usr/bin/env
       )
       for p in "''${host_ro_mounts[@]}"; do
         [ -e "$p" ] && bwrap_opts+=( --ro-bind "$p" "$p" )
