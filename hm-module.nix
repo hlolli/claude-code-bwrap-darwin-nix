@@ -160,17 +160,13 @@ in {
 
     preamble = mkOption {
       type = types.path;
-      default = ./opencode-bwrap/preamble.md;
+      default = ./preamble/preamble.md;
       description = "Path to the preamble / instructions file mounted into the sandbox.";
     };
 
     preambleScript = mkOption {
       type = types.nullOr types.path;
-      default = lib.getExe (pkgs.writeShellApplication {
-        name = "preamble-cmd";
-        runtimeInputs = with pkgs; [onefetch ansifilter coreutils gitMinimal tree gnused];
-        text = builtins.readFile ./opencode-bwrap/preamble.sh;
-      });
+      default = lib.getExe (import ./preamble pkgs);
       example = literalExpression ''null'';
       description = "Store path to a script whose stdout is appended to the preamble at runtime (sets `instructions_command` in the OpenCode config). `null` disables the feature.";
     };

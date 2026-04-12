@@ -22,9 +22,11 @@ if git rev-parse --show-toplevel >/dev/null 2>&1; then
   onefetch --no-art --no-color-palette 2>&1 | ansifilter | sed -r '/^------+$/ d'
 fi
 
-echo '### Top-level files'
+echo '### Directory structure'
 echo
-tree -a -L 1 -F -i --dirsfirst --gitignore -I '.git' --noreport | ansifilter
+echo '```'
+git-tree-digest 150 3 | ansifilter
+echo '```'
 
 if git rev-parse --show-toplevel >/dev/null 2>&1; then
   echo
