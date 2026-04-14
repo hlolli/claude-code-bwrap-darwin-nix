@@ -8,8 +8,8 @@
     src = pkgs.fetchFromGitHub {
       owner = "ex-machina-co";
       repo = "opencode-anthropic-auth";
-      rev = "v1.5.1";
-      hash = "sha256-4lB6b8PCfaLIaZsnN8CKRpALvpzOB2FwxSAIJvv7Z8E=";
+      rev = "v1.6.1";
+      hash = "sha256-ZtxcZAH0GT1No46pGH3XjlljM96HOeIT1LWd/Vkt4OE=";
     };
     # IFD: generate bun.nix from the upstream bun.lock using the bun2nix CLI.
     bun-nix = pkgs.runCommandLocal "opencode-anthropic-auth-bun.nix" {} ''
