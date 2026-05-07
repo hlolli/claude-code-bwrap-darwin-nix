@@ -411,10 +411,14 @@
         -- ${sandboxInit} "''${sandbox_cmd[@]}"
     '';
     derivationArgs = {
-      meta.description = "Enters a (multi-)project sandbox to run `opencode` inside; `.git` entries are mounted read-only unless OPENCODE_UNSAFE_RW_GIT is set.";
-      meta.platforms = lib.platforms.linux;
-      passthru.bwrap-escape-hatch = bwrap-escape-hatch // {inherit escapeHatchShims;};
-      passthru.plugins = plugins;
+      meta = {
+        description = "Enters a (multi-)project sandbox to run `opencode` inside; `.git` entries are mounted read-only unless OPENCODE_UNSAFE_RW_GIT is set.";
+        platforms = lib.platforms.linux;
+      };
+      passthru = {
+        bwrap-escape-hatch = bwrap-escape-hatch // {inherit escapeHatchShims;};
+        inherit plugins config tuiConfig;
+      };
     };
   };
 in
