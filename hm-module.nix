@@ -123,7 +123,7 @@
         inherit (cfg.compaction) reserved;
       };
     providerJSON = cfg.provider;
-    inherit (cfg) dataDirPrefix extraPackages extraEnv extraFwdEnv;
+    inherit (cfg) dataDirPrefix extraConfig extraTuiConfig extraPackages extraEnv extraFwdEnv;
   };
 
   # -- Option helpers (DRY) ------------------------------------------------
@@ -188,6 +188,22 @@ in {
       type = types.path;
       default = ./opencode-bwrap/zshrc;
       description = "Zsh configuration sourced inside the sandbox.";
+    };
+
+    extraConfig = mkOption {
+      type = types.submodule {
+        freeformType = (pkgs.formats.json {}).type;
+      };
+      default = {};
+      description = "Extra config.json.";
+    };
+
+    extraTuiConfig = mkOption {
+      type = types.submodule {
+        freeformType = (pkgs.formats.json {}).type;
+      };
+      default = {};
+      description = "Extra tui.json.";
     };
 
     extraPackages = mkOption {

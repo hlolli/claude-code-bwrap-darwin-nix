@@ -12,6 +12,8 @@
   dataDirPrefix ? ".local/share/opencode-bwrap",
   bashrcSource ? ./bashrc,
   zshrcSource ? ./zshrc,
+  extraConfig ? {},
+  extraTuiConfig ? {},
   extraPackages ? [],
   extraEnv ? {},
   extraFwdEnv ? [],
@@ -43,7 +45,21 @@
     }
   ];
 
-  config = {
+  configFormat = pkgs.formats.json {};
+
+  evalConfig = modules: (lib.evalModules {
+    modules = [{
+      options.conf = lib.mkOption {
+        type = lib.types.submodule {
+          freeformType = configFormat.type;
+        };
+      };
+
+      config.conf = lib.mkMerge modules;
+    }];
+  }).config.conf;
+
+  config = evalConfig [extraConfig {
     "$schema" = "https://opencode.ai/config.json";
     compaction = compactionConfig;
     share = "disabled";
@@ -118,13 +134,13 @@
         else "allow";
       doom_loop = "deny";
     };
-  };
+  }];
 
-  tuiConfig = {
+  tuiConfig = evalConfig [extraTuiConfig {
     "$schema" = "https://opencode.ai/tui.json";
     diff_style = "stacked";
     theme = "solarized";
-  };
+  }];
 
   # Runs inside the sandbox before the interactive shell.
   sandboxInit = pkgs.writeShellScript "sandbox-init" ''
@@ -322,11 +338,11 @@
       bwrap_opts+=( --ro-bind ${opencode-plugins} "$HOME"/.config/opencode/plugins )
 
       # opencode-notifier config
-      bwrap_opts+=( --ro-bind ${pkgs.writeText "opencode-notifier.json" (builtins.toJSON notifierConfig)} "$HOME"/.config/opencode/opencode-notifier.json )
+      bwrap_opts+=( --ro-bind ${configFormat.generate "opencode-notifier.json" notifierConfig} "$HOME"/.config/opencode/opencode-notifier.json )
 
       # OpenCode config
-      bwrap_opts+=( --ro-bind ${pkgs.writeText "config.json" (builtins.toJSON config)} "$HOME"/.config/opencode/config.json )
-      bwrap_opts+=( --ro-bind ${pkgs.writeText "tui.json" (builtins.toJSON tuiConfig)} "$HOME"/.config/opencode/tui.json )
+      bwrap_opts+=( --ro-bind ${configFormat.generate "config.json" config} "$HOME"/.config/opencode/config.json )
+      bwrap_opts+=( --ro-bind ${configFormat.generate "tui.json" tuiConfig} "$HOME"/.config/opencode/tui.json )
 
       rw_opts=()
       ro_git_opts=()
