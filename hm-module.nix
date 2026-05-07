@@ -158,6 +158,13 @@ in {
   options.programs.opencode-bwrap = {
     enable = mkEnableOption "opencode-bwrap bubblewrap sandbox";
 
+    package = mkOption {
+      type = types.package;
+      readOnly = true;
+      default = package;
+      description = "The final configured package that will be added to `home.packages`.";
+    };
+
     preamble = mkOption {
       type = types.path;
       default = ./preamble/preamble.md;
