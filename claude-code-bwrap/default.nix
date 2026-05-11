@@ -29,7 +29,7 @@
 
   serenaConfigFile = ./serena-config.yml;
 
-  safe = pkgs.writeShellApplication {
+  wrapper = pkgs.writeShellApplication {
     name = "claude-code-bwrap";
     runtimeInputs = with pkgs; [coreutils];
     text = ''
@@ -109,10 +109,23 @@
         description = "Runs Claude Code inside a macOS sandbox-exec sandbox; .git directories are protected from writes unless CLAUDE_CODE_BWRAP_UNSAFE_RW_GIT is set.";
         platforms = lib.platforms.darwin;
       };
-      passthru = {
-        inherit mcpConfigFile;
-      };
     };
   };
+
+  completions = pkgs.runCommand "claude-code-bwrap-completions" {} ''
+    install -Dm644 ${./completions/claude-code-bwrap.bash} \
+      $out/share/bash-completion/completions/claude-code-bwrap
+    install -Dm644 ${./completions/_claude-code-bwrap} \
+      $out/share/zsh/site-functions/_claude-code-bwrap
+    install -Dm644 ${./completions/claude-code-bwrap.fish} \
+      $out/share/fish/vendor_completions.d/claude-code-bwrap.fish
+  '';
 in
-  safe
+  pkgs.symlinkJoin {
+    name = "claude-code-bwrap";
+    paths = [wrapper completions];
+    passthru = {
+      inherit mcpConfigFile;
+    };
+    meta = wrapper.meta;
+  }
