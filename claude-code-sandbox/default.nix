@@ -222,12 +222,38 @@
         # TMPDIR (usually /private/var/folders/.../T/)
         echo "(allow file-read* file-write* (subpath \"''${TMPDIR:-/tmp}\"))"
 
-        # Home directory -- allow reads everywhere (shell init, dotfiles,
-        # keychain, config). Only specific subdirs get write access.
-        echo "(allow file-read* (subpath \"$HOME\"))"
+        # Home directory -- only allow reads to specific paths.
+        # file-read-metadata is globally allowed (stat/readdir for PATH resolution).
+        echo "(allow file-read* (literal \"$HOME\"))"
+
+        # Claude Code config (read + write)
         echo "(allow file-read* file-write* (subpath \"$HOME/.claude\"))"
-        echo "(allow file-write* (literal \"$HOME/.claude.json\"))"
+        echo "(allow file-read* file-write* (literal \"$HOME/.claude.json\"))"
         echo "(allow file-read* file-write* (subpath \"$HOME/.config/claude\"))"
+
+        # macOS keychain (read-only, for OAuth credentials)
+        echo "(allow file-read* (subpath \"$HOME/Library/Keychains\"))"
+
+        # macOS notifications
+        echo "(allow file-read* file-write* (subpath \"$HOME/Library/Preferences\"))"
+
+        # Git config (read-only)
+        echo "(allow file-read* (literal \"$HOME/.gitconfig\"))"
+        echo "(allow file-read* (subpath \"$HOME/.config/git\"))"
+
+        # SSH known_hosts for git (read-only, NOT private keys)
+        echo "(allow file-read* (literal \"$HOME/.ssh/known_hosts\"))"
+        echo "(allow file-read* (literal \"$HOME/.ssh/config\"))"
+
+        # Shell init files (read-only, needed by /bin/sh -c)
+        echo "(allow file-read* (literal \"$HOME/.profile\"))"
+        echo "(allow file-read* (literal \"$HOME/.zprofile\"))"
+        echo "(allow file-read* (literal \"$HOME/.zshenv\"))"
+
+        # Nix profile (read-only, for terminfo and tool paths)
+        echo "(allow file-read* (subpath \"$HOME/.nix-profile\"))"
+        echo "(allow file-read* (subpath \"$HOME/.nix-defexpr\"))"
+
         ${lib.optionalString (serena != null) ''
           echo "(allow file-read* file-write* (subpath \"$HOME/.serena\"))"
         ''}
