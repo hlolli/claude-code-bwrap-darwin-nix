@@ -38,57 +38,40 @@
     (version 1)
     (deny default)
 
-    ;; Process
-    (allow process-exec)
+    ;; -- Process --
+    ;; process-exec* : execute binaries (glob covers process-exec)
+    ;; process-fork  : spawn child processes (git, shell commands)
+    ;; signal        : send signals to children (SIGTERM on exit, interactive TUI)
     (allow process-exec*)
     (allow process-fork)
-    (allow process-info*)
-    (allow process-codesigning-status*)
     (allow signal)
 
-    ;; Mach IPC (critical for macOS -- almost everything uses this)
+    ;; -- Mach IPC --
+    ;; mach-lookup : connect to system services (DNS, keychain, Security.framework).
+    ;;              macOS routes nearly all system APIs through Mach IPC.
     (allow mach-lookup)
-    (allow mach-register)
-    (allow mach-task-name)
-    (allow mach-per-user-lookup)
-    (allow mach-cross-domain-lookup)
 
-    ;; POSIX IPC
+    ;; -- POSIX shared memory --
+    ;; Node.js/V8 uses shm for worker threads and garbage collector coordination.
     (allow ipc-posix-shm-read-data)
     (allow ipc-posix-shm-write-create)
     (allow ipc-posix-shm-write-data)
-    (allow ipc-posix-shm-read-metadata)
-    (allow ipc-posix-shm-write-unlink)
-    (allow ipc-posix-sem-open)
-    (allow ipc-posix-sem-post)
-    (allow ipc-posix-sem-wait)
-    (allow ipc-posix-sem-unlink)
-    (allow ipc-posix-sem-create)
-    (allow ipc-sysv-msg)
-    (allow ipc-sysv-sem)
-    (allow ipc-sysv-shm)
 
-    ;; IOKit
-    (allow iokit-open)
-    (allow iokit-get-properties)
-    (allow iokit-set-properties)
-
-    ;; System
+    ;; -- System --
+    ;; sysctl-read   : Node.js os module reads kernel info (os.type, os.release)
+    ;; system-socket : Unix domain sockets (MCP server stdio, internal IPC)
+    ;; pseudo-tty    : allocate PTYs for the interactive TUI and subprocesses
+    ;; lsopen        : open URLs in browser (OAuth login flow)
     (allow sysctl-read)
-    (allow sysctl-write)
     (allow system-socket)
-    (allow system-fsctl)
     (allow pseudo-tty)
-    (allow user-preference-read)
     (allow lsopen)
-    (allow distributed-notification-post)
-    (allow darwin-notification-post)
-    (allow appleevent-send)
 
-    ;; Executable mapping (required to load binaries and shared libraries)
-    (allow file-map-executable)
-
-    ;; Allow stat/readdir for PATH resolution and system paths.
+    ;; -- Filesystem metadata --
+    ;; stat/readdir on system paths only. Required for PATH resolution
+    ;; (posix_spawnp) and shared library loading. Does NOT allow reading
+    ;; file contents. $HOME metadata is added at runtime for only the
+    ;; specific paths and PATH entries that need it.
     (allow file-read-metadata
       (subpath "/nix")
       (subpath "/usr")
@@ -103,9 +86,12 @@
       (subpath "/var")
       (subpath "/tmp")
       (subpath "/dev")
+      (literal "/Users")
       (literal "/"))
 
-    ;; System file reads (read-only)
+    ;; -- System file reads (read-only) --
+    ;; Nix store (all tools and Claude Code itself), system frameworks,
+    ;; dynamic linker, shared libraries, system configuration.
     (allow file-read*
       (subpath "/nix")
       (subpath "/usr")
@@ -121,18 +107,21 @@
       (literal "/var")
       (literal "/tmp"))
 
-    ;; Device access
+    ;; -- Device access --
+    ;; /dev/null, /dev/urandom (crypto), /dev/tty* (terminal).
+    ;; file-ioctl for terminal raw mode (interactive TUI uses TIOCGWINSZ, tcsetattr).
     (allow file-read* file-write* (subpath "/dev"))
     (allow file-ioctl (subpath "/dev"))
 
-    ;; Temp directories
+    ;; -- Temp directories --
     (allow file-read* file-write*
       (subpath "/tmp")
       (subpath "/private/tmp"))
 
-    ;; Network
+    ;; -- Network --
+    ;; network-outbound : API calls to Anthropic, git fetches
+    ;; network-bind     : Node.js binds local ports for MCP server IPC
     (allow network-outbound)
-    (allow network-inbound)
     (allow network-bind)
   '' + lib.optionalString (sandboxExtraReadWritePaths != []) ''
 
@@ -231,45 +220,86 @@
         # TMPDIR (usually /private/var/folders/.../T/)
         echo "(allow file-read* file-write* (subpath \"''${TMPDIR:-/tmp}\"))"
 
-        # Home directory -- only allow reads to specific paths.
-        # file-read-metadata is globally allowed (stat/readdir for PATH resolution).
+        # Allowed $HOME paths (read-only unless noted)
+        home_allowed_paths=(
+          "$HOME/.claude"            # r/w: Claude config
+          "$HOME/.config/claude"     # r/w: Claude config
+          "$HOME/Library/Keychains"  # r: OAuth credentials
+          "$HOME/Library/Preferences" # r/w: macOS notifications
+          "$HOME/.config/git"        # r: git config
+          "$HOME/.nix-profile"       # r: nix tools, terminfo
+          "$HOME/.nix-defexpr"       # r: nix expressions
+          ${lib.optionalString (serena != null) ''"$HOME/.serena"  # r/w: Serena''}
+        )
+
+        home_rw_paths=(
+          "$HOME/.claude"
+          "$HOME/.config/claude"
+          "$HOME/Library/Preferences"
+          ${lib.optionalString (serena != null) ''"$HOME/.serena"''}
+        )
+
+        # Emit file-read-metadata for every allowed path, its parents
+        # back to $HOME, and every PATH entry under $HOME + its parents.
+        # This is the minimum needed for path traversal and posix_spawnp.
+        declare -A _seen_meta
+        _allow_meta() {
+          if [[ -z "''${_seen_meta[$1]:-}" ]]; then
+            _seen_meta["$1"]=1
+            echo "(allow file-read-metadata (literal \"$1\"))"
+          fi
+        }
+        _allow_meta_tree() {
+          local p="$1"
+          while [[ "$p" != "$HOME" && "$p" != "/" ]]; do
+            _allow_meta "$p"
+            p="$(dirname "$p")"
+          done
+        }
+
+        _allow_meta "$HOME"
+
+        # Metadata for allowed $HOME paths + parent chain
+        for _p in "''${home_allowed_paths[@]}"; do
+          echo "(allow file-read-metadata (subpath \"$_p\"))"
+          _allow_meta_tree "$_p"
+        done
+
+        # Metadata for PATH entries under $HOME + parent chain
+        IFS=':' read -ra _path_entries <<< "$PATH"
+        for _entry in "''${_path_entries[@]}"; do
+          case "$_entry" in
+            "$HOME"/*)
+              echo "(allow file-read-metadata (subpath \"$_entry\"))"
+              _allow_meta_tree "$_entry"
+              ;;
+          esac
+        done
+
+        # Metadata for cwd + project dirs parent chain
+        # (kernel needs to stat each component to resolve the path)
+        _allow_meta_tree "$cwd"
+        for d in "''${project_dirs[@]}"; do
+          _allow_meta_tree "$d"
+        done
+
+        # File reads for specific paths
         echo "(allow file-read* (literal \"$HOME\"))"
-
-        # Claude Code config (read + write)
-        echo "(allow file-read* file-write* (subpath \"$HOME/.claude\"))"
+        for _p in "''${home_allowed_paths[@]}"; do
+          echo "(allow file-read* (subpath \"$_p\"))"
+        done
         echo "(allow file-read* file-write* (literal \"$HOME/.claude.json\"))"
-        echo "(allow file-read* file-write* (subpath \"$HOME/.config/claude\"))"
-
-        # macOS keychain (read-only, for OAuth credentials)
-        echo "(allow file-read* (subpath \"$HOME/Library/Keychains\"))"
-
-        # macOS notifications
-        echo "(allow file-read* file-write* (subpath \"$HOME/Library/Preferences\"))"
-
-        # Git config (read-only)
         echo "(allow file-read* (literal \"$HOME/.gitconfig\"))"
-        echo "(allow file-read* (subpath \"$HOME/.config/git\"))"
-
-        # SSH known_hosts for git (read-only, NOT private keys)
         echo "(allow file-read* (literal \"$HOME/.ssh/known_hosts\"))"
         echo "(allow file-read* (literal \"$HOME/.ssh/config\"))"
-
-        # Shell init files (read-only, needed by /bin/sh -c)
         echo "(allow file-read* (literal \"$HOME/.profile\"))"
         echo "(allow file-read* (literal \"$HOME/.zprofile\"))"
         echo "(allow file-read* (literal \"$HOME/.zshenv\"))"
 
-        # stat/readdir for $HOME and PATH directories under it
-        # (needed for posix_spawnp PATH resolution, does not expose contents)
-        echo "(allow file-read-metadata (subpath \"$HOME\"))"
-
-        # Nix profile (read-only, for terminfo and tool paths)
-        echo "(allow file-read* (subpath \"$HOME/.nix-profile\"))"
-        echo "(allow file-read* (subpath \"$HOME/.nix-defexpr\"))"
-
-        ${lib.optionalString (serena != null) ''
-          echo "(allow file-read* file-write* (subpath \"$HOME/.serena\"))"
-        ''}
+        # Write access for specific paths
+        for _p in "''${home_rw_paths[@]}"; do
+          echo "(allow file-write* (subpath \"$_p\"))"
+        done
 
         # Current working directory -- always accessible
         echo "(allow file-read* file-write* (subpath \"$cwd\"))"
