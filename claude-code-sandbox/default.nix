@@ -38,20 +38,59 @@
     (version 1)
     (deny default)
 
-    ;; Process management
-    (allow process*)
+    ;; Process
+    (allow process-exec)
+    (allow process-exec*)
+    (allow process-fork)
+    (allow process-info*)
+    (allow process-codesigning-status*)
     (allow signal)
 
-    ;; Sysctl
-    (allow sysctl-read)
+    ;; Mach IPC (critical for macOS -- almost everything uses this)
+    (allow mach-lookup)
+    (allow mach-register)
+    (allow mach-task-name)
+    (allow mach-per-user-lookup)
+    (allow mach-cross-domain-lookup)
 
-    ;; Mach / IPC (macOS system services)
-    (allow mach*)
-    (allow ipc-posix-shm*)
+    ;; POSIX IPC
+    (allow ipc-posix-shm-read-data)
+    (allow ipc-posix-shm-write-create)
+    (allow ipc-posix-shm-write-data)
+    (allow ipc-posix-shm-read-metadata)
+    (allow ipc-posix-shm-write-unlink)
+    (allow ipc-posix-sem-open)
+    (allow ipc-posix-sem-post)
+    (allow ipc-posix-sem-wait)
+    (allow ipc-posix-sem-unlink)
+    (allow ipc-posix-sem-create)
+    (allow ipc-sysv-msg)
+    (allow ipc-sysv-sem)
+    (allow ipc-sysv-shm)
 
     ;; IOKit
     (allow iokit-open)
     (allow iokit-get-properties)
+    (allow iokit-set-properties)
+
+    ;; System
+    (allow sysctl-read)
+    (allow sysctl-write)
+    (allow system-socket)
+    (allow system-fsctl)
+    (allow pseudo-tty)
+    (allow user-preference-read)
+    (allow lsopen)
+    (allow distributed-notification-post)
+    (allow darwin-notification-post)
+    (allow appleevent-send)
+
+    ;; Executable mapping (required to load binaries and shared libraries)
+    (allow file-map-executable)
+
+    ;; Allow stat/readdir everywhere (needed for PATH resolution).
+    ;; This does NOT allow reading file contents.
+    (allow file-read-metadata)
 
     ;; System file reads (read-only)
     (allow file-read*
@@ -79,7 +118,9 @@
       (subpath "/private/tmp"))
 
     ;; Network
-    (allow network*)
+    (allow network-outbound)
+    (allow network-inbound)
+    (allow network-bind)
   '' + lib.optionalString (sandboxExtraDeny != []) ''
 
     ;; Extra deny rules
@@ -181,15 +222,15 @@
         # TMPDIR (usually /private/var/folders/.../T/)
         echo "(allow file-read* file-write* (subpath \"''${TMPDIR:-/tmp}\"))"
 
-        # Home directory -- allow Claude config, git config
+        # Home directory -- allow reads everywhere (shell init, dotfiles,
+        # keychain, config). Only specific subdirs get write access.
+        echo "(allow file-read* (subpath \"$HOME\"))"
         echo "(allow file-read* file-write* (subpath \"$HOME/.claude\"))"
+        echo "(allow file-write* (literal \"$HOME/.claude.json\"))"
         echo "(allow file-read* file-write* (subpath \"$HOME/.config/claude\"))"
         ${lib.optionalString (serena != null) ''
           echo "(allow file-read* file-write* (subpath \"$HOME/.serena\"))"
         ''}
-        echo "(allow file-read* (literal \"$HOME\"))"
-        echo "(allow file-read* (literal \"$HOME/.gitconfig\"))"
-        echo "(allow file-read* (subpath \"$HOME/.config/git\"))"
 
         # Current working directory -- always accessible
         echo "(allow file-read* file-write* (subpath \"$cwd\"))"
