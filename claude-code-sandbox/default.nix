@@ -289,7 +289,9 @@
           echo "(allow file-read* (subpath \"$_p\"))"
         done
         echo "(allow file-read* file-write* (literal \"$HOME/.claude.json\"))"
-        echo "(allow file-read* (literal \"$HOME/.gitconfig\"))"
+        # Regex to match .gitconfig and conditional includes like .gitconfig-work
+        # (git includeIf loads extra configs based on repo path)
+        printf '%s\n' "(allow file-read* (regex #\"^$HOME/\\.gitconfig\"))"
         echo "(allow file-read* (literal \"$HOME/.ssh/known_hosts\"))"
         echo "(allow file-read* (literal \"$HOME/.ssh/config\"))"
         echo "(allow file-read* (literal \"$HOME/.profile\"))"
