@@ -283,8 +283,8 @@
           _allow_meta_tree "$d"
         done
 
-        # File reads for specific paths
-        echo "(allow file-read* (literal \"$HOME\"))"
+        # File reads for specific paths (no readdir on $HOME itself)
+        echo "(allow file-read* (literal \"$HOME/CLAUDE.md\"))"
         for _p in "''${home_allowed_paths[@]}"; do
           echo "(allow file-read* (subpath \"$_p\"))"
         done
