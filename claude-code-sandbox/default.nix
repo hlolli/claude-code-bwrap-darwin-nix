@@ -230,6 +230,7 @@
           "$HOME/.config/git"        # r: git config
           "$HOME/.nix-profile"       # r: nix tools, terminfo
           "$HOME/.nix-defexpr"       # r: nix expressions
+          "$HOME/.cache/nix"         # r/w: nix eval cache, flake registry, tarball cache; nix commands fail without it
           ${lib.optionalString (serena != null) ''"$HOME/.serena"  # r/w: Serena''}
         )
 
@@ -237,6 +238,7 @@
           "$HOME/.claude"
           "$HOME/.config/claude"
           "$HOME/Library/Preferences"
+          "$HOME/.cache/nix"
           ${lib.optionalString (serena != null) ''"$HOME/.serena"''}
         )
 
